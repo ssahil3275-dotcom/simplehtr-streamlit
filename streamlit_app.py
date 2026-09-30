@@ -1,18 +1,27 @@
 ﻿import os
 import sys
+from pathlib import Path
 
-# 1. Guarantee working directory is SimpleHTR/src
-SRC_DIR = os.path.dirname(os.path.abspath(__file__))
-if SRC_DIR not in sys.path:
-    sys.path.insert(0, SRC_DIR)
-os.chdir(SRC_DIR)
+# Resolve path to SimpleHTR/src
+ROOT_DIR = Path(__file__).resolve().parent
+SRC_DIR = ROOT_DIR / "SimpleHTR" / "src"
+
+# Add SimpleHTR/src to sys.path so 'main' and 'preprocessor' can be imported
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+# Change directory so SimpleHTR's relative paths to ../model resolve properly
+os.chdir(str(SRC_DIR))
 
 import streamlit as st
 import numpy as np
 import cv2
 from PIL import Image
 
-# 2. Render the page UI immediately
+# Import SimpleHTR modules directly
+from main import DecoderType, Model, char_list_from_file
+from preprocessor import Preprocessor
+
 st.set_page_config(
     page_title="Handwriting Recognition (SimpleHTR)",
     page_icon="✍️",
@@ -22,7 +31,6 @@ st.set_page_config(
 st.title("✍️ Handwriting OCR Web Interface")
 st.markdown("Upload a single line or word of handwritten text to extract characters.")
 
-# 3. Model wrapper
 class Batch:
     def __init__(self, imgs, line_mode=False):
         self.imgs = imgs
@@ -30,14 +38,10 @@ class Batch:
 
 @st.cache_resource(show_spinner="Loading SimpleHTR neural network weights...")
 def load_htr_model():
-    from main import DecoderType, Model, char_list_from_file
     char_list = char_list_from_file()
-    # BestPath avoids beam search initialization overhead on cloud
     decoder_type = DecoderType.BestPath
-    model = Model(char_list, decoder_type, must_restore=True)
-    return model
+    return Model(char_list, decoder_type, must_restore=True)
 
-# Only trigger model loading when needed, or with an explicit status container
 status_box = st.empty()
 status_box.info("Checking model readiness...")
 
@@ -48,7 +52,6 @@ except Exception as e:
     status_box.error(f"Error loading model weights: {e}")
     st.stop()
 
-# 4. File uploader
 uploaded_file = st.file_uploader(
     "Choose a handwritten image...", 
     type=["png", "jpg", "jpeg"]
@@ -58,7 +61,6 @@ st.sidebar.header("Inference Settings")
 apply_denoise = st.sidebar.checkbox("Auto-clean background & ruled lines", value=False)
 
 def preprocess_image(pil_img, clean=False):
-    from preprocessor import Preprocessor
     img_gray = np.array(pil_img.convert("L"))
 
     if clean:
