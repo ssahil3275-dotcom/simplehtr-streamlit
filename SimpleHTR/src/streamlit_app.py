@@ -2,20 +2,15 @@
 import sys
 from pathlib import Path
 
-# Explicitly compute absolute paths
-CURRENT_FILE = Path(__file__).resolve()
-SRC_DIR = CURRENT_FILE.parent                      # .../SimpleHTR/src
-SIMPLEHTR_DIR = SRC_DIR.parent                    # .../SimpleHTR
-REPO_ROOT = SIMPLEHTR_DIR.parent                  # repository root
+# Add script directory and its parent directories to sys.path
+current_dir = Path(__file__).resolve().parent
+for parent in [current_dir, current_dir.parent, current_dir.parent.parent]:
+    if str(parent) not in sys.path:
+        sys.path.insert(0, str(parent))
 
-# Add all relevant directories to sys.path so 'main' can be found regardless of execution root
-for p in [str(SRC_DIR), str(SIMPLEHTR_DIR), str(REPO_ROOT)]:
-    if p not in sys.path:
-        sys.path.insert(0, p)
-
-# Set working directory to src so relative paths (like ../model) work
+# Ensure working directory is set to src
 try:
-    os.chdir(str(SRC_DIR))
+    os.chdir(str(current_dir))
 except Exception:
     pass
 
@@ -23,10 +18,6 @@ import streamlit as st
 import numpy as np
 import cv2
 from PIL import Image
-
-# Import SimpleHTR modules
-from main import DecoderType, Model, char_list_from_file
-from preprocessor import Preprocessor
 
 st.set_page_config(
     page_title="Handwriting Recognition (SimpleHTR)",
@@ -37,6 +28,22 @@ st.set_page_config(
 st.title("✍️ Handwriting OCR Web Interface")
 st.markdown("Upload a single line or word of handwritten text to extract characters.")
 
+# Diagnostic check visible on the web UI
+status_box = st.empty()
+
+try:
+    import main
+    from main import DecoderType, Model, char_list_from_file
+    from preprocessor import Preprocessor
+except ModuleNotFoundError as e:
+    status_box.error(
+        f"Python cannot find 'main.py'.\n"
+        f"Current working dir: {os.getcwd()}\n"
+        f"Files in current folder: {os.listdir(os.getcwd())}\n"
+        f"sys.path: {sys.path[:3]}"
+    )
+    st.stop()
+
 class Batch:
     def __init__(self, imgs, line_mode=False):
         self.imgs = imgs
@@ -46,11 +53,7 @@ class Batch:
 def load_htr_model():
     char_list = char_list_from_file()
     decoder_type = DecoderType.BestPath
-    model = Model(char_list, decoder_type, must_restore=True)
-    return model
-
-status_box = st.empty()
-status_box.info("Checking model readiness...")
+    return Model(char_list, decoder_type, must_restore=True)
 
 try:
     model = load_htr_model()
