@@ -6,19 +6,24 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent
 SRC_DIR = ROOT_DIR / "SimpleHTR" / "src"
 
-# Add SimpleHTR/src to sys.path so 'main' and 'preprocessor' can be imported
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-# Change directory so SimpleHTR's relative paths to ../model resolve properly
-os.chdir(str(SRC_DIR))
+try:
+    os.chdir(str(SRC_DIR))
+except Exception:
+    pass
+
+import numpy as np
+
+# Backwards compatibility fix for deprecated NumPy types in SimpleHTR
+if not hasattr(np, "float"):
+    np.float = float
 
 import streamlit as st
-import numpy as np
 import cv2
 from PIL import Image
 
-# Import SimpleHTR modules directly
 from main import DecoderType, Model, char_list_from_file
 from preprocessor import Preprocessor
 
